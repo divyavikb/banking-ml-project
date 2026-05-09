@@ -1,0 +1,23 @@
+artifact_path: file:///D:/banking-ml-project/mlruns/684741718221181154/models/m-afd2d2b0a76e443d9defa702e91d6ade/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.11.0
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+    skops_trusted_types: null
+mlflow_version: 3.10.0
+model_id: m-afd2d2b0a76e443d9defa702e91d6ade
+model_size_bytes: 357320
+model_uuid: m-afd2d2b0a76e443d9defa702e91d6ade
+prompts: null
+run_id: 4eaaefb98958439fab478882bf2548e0
+utc_time_created: '2026-03-06 02:52:30.324204'

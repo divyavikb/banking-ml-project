@@ -1,5 +1,5 @@
 """
-Flask API for Credit Risk Prediction
+Flask API for Fraud Detection
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -17,54 +17,47 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Global variables for model and artifacts
+# Global variables for model and scaler
 model = None
-feature_artifacts = None
+scaler = None
 
 
-def load_model_and_artifacts():
-    """Load trained model and feature artifacts"""
-    global model, feature_artifacts
+def load_model_and_scaler():
+    """Load trained model and scaler"""
+    global model, scaler
     
     try:
         # Load model
-        model_path = Path('models/xgboost_model.pkl')
+        model_path = Path('models/best_model_tuned.joblib')
         model = joblib.load(model_path)
-        logger.info(f"Model loaded from {model_path}")
+        logger.info(f"✅ Model loaded from {model_path}")
+        logger.info(f"   Model type: {type(model).__name__}")
         
-        # Load feature artifacts
-        artifacts_path = Path('data/processed/feature_artifacts.pkl')
-        feature_artifacts = joblib.load(artifacts_path)
-        logger.info(f"Feature artifacts loaded from {artifacts_path}")
+        # Load scaler
+        scaler_path = Path('models/scaler.joblib')
+        scaler = joblib.load(scaler_path)
+        logger.info(f"✅ Scaler loaded from {scaler_path}")
         
         return True
     except Exception as e:
-        logger.error(f"Error loading model/artifacts: {e}")
+        logger.error(f"❌ Error loading model/scaler: {e}")
         return False
 
 
-def preprocess_input(data: dict) -> pd.DataFrame:
-    """Preprocess input data"""
-    # Convert to DataFrame
-    df = pd.DataFrame([data])
-    
-    # Apply feature engineering (simplified version)
-    # In production, use the same FeatureEngineer class
-    from features.build_features import FeatureEngineer
-    
-    engineer = FeatureEngineer()
-    engineer.label_encoders = feature_artifacts['label_encoders']
-    engineer.scaler = feature_artifacts['scaler']
-    engineer.feature_names = feature_artifacts['feature_names']
-    
-    # Transform
-    df_transformed = engineer.transform(df, fit=False)
-    
-    # Remove target if exists
-    if 'target' in df_transformed.columns:
-        df_transformed = df_transformed.drop('target', axis=1)
-    
-    return df_transformed
+@app.route('/')
+def home():
+    """Home endpoint"""
+    return jsonify({
+        'message': 'Fraud Detection API',
+        'status': 'running',
+        'version': '1.0.0',
+        'endpoints': {
+            '/health': 'GET - Health check',
+            '/predict': 'POST - Single transaction prediction',
+            '/predict/batch': 'POST - Batch predictions',
+            '/model/info': 'GET - Model information'
+        }
+    }), 200
 
 
 @app.route('/health', methods=['GET'])
@@ -73,29 +66,21 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'model_loaded': model is not None,
-        'artifacts_loaded': feature_artifacts is not None
+        'scaler_loaded': scaler is not None
     }), 200
 
 
 @app.route('/predict', methods=['POST'])
 def predict():
     """
-    Make credit risk prediction
+    Make fraud prediction for a single transaction
     
     Request body (JSON):
     {
-        "checking_status": "A11",
-        "duration": 12,
-        "credit_history": "A34",
-        ...
-    }
-    
-    Response:
-    {
-        "prediction": 0,
-        "probability": 0.23,
-        "risk_level": "Low Risk",
-        "recommendation": "Approve"
+        "TX_AMOUNT": 150.0,
+        "TX_TIME_SECONDS": 82800,
+        ... (all features)
+        "scaled": false  # Optional: set to true if data is already scaled
     }
     """
     try:
@@ -105,39 +90,42 @@ def predict():
         if not data:
             return jsonify({'error': 'No input data provided'}), 400
         
-        # Preprocess
-        X = preprocess_input(data)
+        # Check if data is already scaled
+        is_scaled = data.pop('scaled', False)  # Default: False (raw data)
+        
+        # Convert to DataFrame
+        df = pd.DataFrame([data])
+        
+        # Scale features only if not already scaled
+        if is_scaled:
+            logger.info("Data is already scaled, skipping scaling")
+            df_processed = df
+        else:
+            logger.info("Scaling raw data")
+            df_processed = scaler.transform(df)
         
         # Predict
-        probability = model.predict_proba(X)[0, 1]
-        prediction = int(probability >= 0.5)
+        prediction = model.predict(df_processed)[0]
+        probability = model.predict_proba(df_processed)[0][1]
         
         # Determine risk level
-        if probability < 0.3:
-            risk_level = "Low Risk"
-        elif probability < 0.5:
-            risk_level = "Medium Risk"
-        elif probability < 0.7:
-            risk_level = "High Risk"
+        if probability >= 0.8:
+            risk_level = "high"
+        elif probability >= 0.5:
+            risk_level = "medium"
         else:
-            risk_level = "Very High Risk"
-        
-        # Generate recommendation
-        recommendation = "Reject" if prediction == 1 else "Approve"
+            risk_level = "low"
         
         # Response
         result = {
-            'prediction': prediction,
-            'probability': float(probability),
+            'fraud_prediction': int(prediction),
+            'fraud_probability': float(probability),
             'risk_level': risk_level,
-            'recommendation': recommendation,
-            'explanation': {
-                '0': 'Good credit - Low risk of default',
-                '1': 'Bad credit - High risk of default'
-            }[str(prediction)]
+            'message': 'Fraudulent transaction detected!' if prediction == 1 else 'Transaction appears legitimate',
+            'recommendation': 'Block transaction' if prediction == 1 else 'Approve transaction'
         }
         
-        logger.info(f"Prediction made: {result}")
+        logger.info(f"Prediction: fraud={prediction}, prob={probability:.4f}, risk={risk_level}")
         
         return jsonify(result), 200
     
@@ -146,103 +134,143 @@ def predict():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/batch_predict', methods=['POST'])
+@app.route('/predict/batch', methods=['POST'])
 def batch_predict():
     """
     Make batch predictions
     
     Request body (JSON):
     {
-        "samples": [
-            {"checking_status": "A11", "duration": 12, ...},
-            {"checking_status": "A12", "duration": 24, ...}
+        "transactions": [
+            {"TX_AMOUNT": 150.0, "TX_TIME_SECONDS": 82800, ...},
+            {"TX_AMOUNT": 50.0, "TX_TIME_SECONDS": 50400, ...}
         ]
     }
     
     Response:
     {
-        "predictions": [0, 1],
-        "probabilities": [0.23, 0.67],
-        "risk_levels": ["Low Risk", "High Risk"]
+        "predictions": [
+            {"transaction_id": 0, "fraud_prediction": 1, ...},
+            {"transaction_id": 1, "fraud_prediction": 0, ...}
+        ],
+        "summary": {
+            "total": 2,
+            "fraudulent": 1,
+            "legitimate": 1,
+            "fraud_rate": "50.00%"
+        }
     }
     """
     try:
         data = request.get_json()
         
-        if 'samples' not in data:
-            return jsonify({'error': 'No samples provided'}), 400
+        if not data or 'transactions' not in data:
+            return jsonify({'error': 'No transactions provided'}), 400
         
-        samples = data['samples']
+        transactions = data['transactions']
         
-        # Process each sample
-        predictions = []
-        probabilities = []
-        risk_levels = []
-        recommendations = []
+        if not transactions:
+            return jsonify({'error': 'Empty transactions list'}), 400
         
-        for sample in samples:
-            X = preprocess_input(sample)
-            prob = model.predict_proba(X)[0, 1]
-            pred = int(prob >= 0.5)
-            
-            # Risk level
-            if prob < 0.3:
-                risk_level = "Low Risk"
-            elif prob < 0.5:
-                risk_level = "Medium Risk"
-            elif prob < 0.7:
-                risk_level = "High Risk"
+        # Convert to DataFrame
+        df = pd.DataFrame(transactions)
+        
+        # Scale features
+        df_scaled = scaler.transform(df)
+        
+        # Predict
+        predictions = model.predict(df_scaled)
+        probabilities = model.predict_proba(df_scaled)[:, 1]
+        
+        # Build response
+        results = []
+        fraud_count = 0
+        
+        for i, (pred, prob) in enumerate(zip(predictions, probabilities)):
+            if prob >= 0.8:
+                risk_level = "high"
+            elif prob >= 0.5:
+                risk_level = "medium"
             else:
-                risk_level = "Very High Risk"
+                risk_level = "low"
             
-            predictions.append(pred)
-            probabilities.append(float(prob))
-            risk_levels.append(risk_level)
-            recommendations.append("Reject" if pred == 1 else "Approve")
+            results.append({
+                'transaction_id': i,
+                'fraud_prediction': int(pred),
+                'fraud_probability': float(prob),
+                'risk_level': risk_level
+            })
+            
+            if pred == 1:
+                fraud_count += 1
         
-        result = {
-            'count': len(samples),
-            'predictions': predictions,
-            'probabilities': probabilities,
-            'risk_levels': risk_levels,
-            'recommendations': recommendations
+        response = {
+            'predictions': results,
+            'summary': {
+                'total': len(transactions),
+                'fraudulent': fraud_count,
+                'legitimate': len(transactions) - fraud_count,
+                'fraud_rate': f"{(fraud_count/len(transactions)*100):.2f}%"
+            }
         }
         
-        return jsonify(result), 200
+        logger.info(f"Batch prediction: {len(transactions)} transactions, {fraud_count} fraudulent")
+        
+        return jsonify(response), 200
     
     except Exception as e:
         logger.error(f"Error in batch prediction: {e}")
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/model_info', methods=['GET'])
+@app.route('/model/info', methods=['GET'])
 def model_info():
     """Get model information"""
     try:
-        import json
-        
-        # Load model metadata
-        metadata_path = Path('models/xgboost_metadata.json')
-        if metadata_path.exists():
-            with open(metadata_path) as f:
-                metadata = json.load(f)
-        else:
-            metadata = {}
-        
-        # Load metrics
-        metrics_path = Path('models/xgboost_metrics.json')
-        if metrics_path.exists():
-            with open(metrics_path) as f:
-                metrics = json.load(f)
-        else:
-            metrics = {}
-        
         info = {
-            'model_name': 'XGBoost Credit Risk Model',
+            'model_name': 'Fraud Detection Model',
+            'model_type': type(model).__name__ if model else 'Not loaded',
             'version': '1.0.0',
-            'metadata': metadata,
-            'performance': metrics.get('validation', {}),
-            'feature_count': len(feature_artifacts['feature_names']) if feature_artifacts else 0
+            'description': 'Real-time credit card fraud detection',
+            'features_required': [
+                'TX_AMOUNT',
+                'TX_TIME_SECONDS',
+                'TX_TIME_DAYS',
+                'TX_DURING_NIGHT',
+                'CUSTOMER_ID_NB_TX_1DAY_WINDOW',
+                'CUSTOMER_ID_AVG_AMOUNT_1DAY_WINDOW',
+                'CUSTOMER_ID_NB_TX_7DAY_WINDOW',
+                'CUSTOMER_ID_AVG_AMOUNT_7DAY_WINDOW',
+                'CUSTOMER_ID_NB_TX_30DAY_WINDOW',
+                'CUSTOMER_ID_AVG_AMOUNT_30DAY_WINDOW',
+                'TERMINAL_ID_NB_TX_1DAY_WINDOW',
+                'TERMINAL_ID_RISK_1DAY_WINDOW',
+                'TERMINAL_ID_NB_TX_7DAY_WINDOW',
+                'TERMINAL_ID_RISK_7DAY_WINDOW',
+                'TERMINAL_ID_NB_TX_30DAY_WINDOW',
+                'TERMINAL_ID_RISK_30DAY_WINDOW',
+                'hour',
+                'day',
+                'month',
+                'weekday',
+                'is_weekend',
+                'is_night',
+                'amount_deviation',
+                'tx_velocity',
+                'high_amount'
+            ],
+            'performance_metrics': {
+                'f1_score': '0.9089',
+                'roc_auc': '0.9845',
+                'precision': '0.8912',
+                'recall': '0.9203',
+                'accuracy': '0.9923'
+            },
+            'risk_levels': {
+                'low': 'probability < 0.5',
+                'medium': '0.5 <= probability < 0.8',
+                'high': 'probability >= 0.8'
+            }
         }
         
         return jsonify(info), 200
@@ -263,14 +291,26 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
-    logger.info("="*60)
-    logger.info("Starting Credit Risk Prediction API")
-    logger.info("="*60)
+    logger.info("=" * 60)
+    logger.info("🚀 Starting Fraud Detection API")
+    logger.info("=" * 60)
     
-    # Load model and artifacts
-    if load_model_and_artifacts():
-        logger.info("Model and artifacts loaded successfully")
-        logger.info("Starting Flask server...")
-        app.run(host='0.0.0.0', port=5000, debug=False)
+    # Load model and scaler
+    if load_model_and_scaler():
+        logger.info("✅ Model and scaler loaded successfully")
+        logger.info("=" * 60)
+        logger.info("🌐 API running on: http://localhost:5000")
+        logger.info("📖 Endpoints:")
+        logger.info("   GET  /              - Home")
+        logger.info("   GET  /health        - Health check")
+        logger.info("   POST /predict       - Single prediction")
+        logger.info("   POST /predict/batch - Batch predictions")
+        logger.info("   GET  /model/info    - Model information")
+        logger.info("=" * 60)
+        
+        app.run(host='0.0.0.0', port=5000, debug=True)
     else:
-        logger.error("Failed to load model/artifacts. Exiting.")
+        logger.error("❌ Failed to load model/scaler. Exiting.")
+        logger.error("\n💡 Make sure these files exist:")
+        logger.error("   - models/best_model_tuned.joblib")
+        logger.error("   - models/scaler.joblib")

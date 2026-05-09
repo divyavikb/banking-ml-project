@@ -1,0 +1,10 @@
+artifact_location: file:///D:/banking-ml-project/mlruns/684741718221181154/models/m-afd2d2b0a76e443d9defa702e91d6ade/artifacts
+creation_timestamp: 1772765550157
+experiment_id: '684741718221181154'
+last_updated_timestamp: 1772765559609
+model_id: m-afd2d2b0a76e443d9defa702e91d6ade
+model_type: ''
+name: model
+source_run_id: 4eaaefb98958439fab478882bf2548e0
+status: 2
+status_message: null

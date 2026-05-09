@@ -1,0 +1,14 @@
+artifact_uri: file:///D:/banking-ml-project/mlruns/684741718221181154/be4b1fb559934da38a6a34f69abb6a21/artifacts
+end_time: 1772273871564
+entry_point_name: ''
+experiment_id: '684741718221181154'
+lifecycle_stage: active
+run_id: be4b1fb559934da38a6a34f69abb6a21
+run_name: Random Forest
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772273762610
+status: 3
+tags: []
+user_id: Dell

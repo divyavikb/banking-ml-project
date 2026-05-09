@@ -1,0 +1,14 @@
+artifact_uri: file:///D:/banking-ml-project/mlruns/684741718221181154/2357b320dd1f4ad1bcf2bc57e3926333/artifacts
+end_time: 1772273762601
+entry_point_name: ''
+experiment_id: '684741718221181154'
+lifecycle_stage: active
+run_id: 2357b320dd1f4ad1bcf2bc57e3926333
+run_name: Logistic Regression
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772273746934
+status: 3
+tags: []
+user_id: Dell

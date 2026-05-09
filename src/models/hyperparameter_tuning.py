@@ -31,11 +31,11 @@ class ModelTuner:
         # Split train for validation
         logger.info("📊 Splitting train data for validation...")
         self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(
-            X_train, y_train, test_size=0.2, random_state=1
+            X_train, y_train, test_size=0.2, random_state=42
         )
         logger.info(f"   Train: {len(self.X_train):,}")
         logger.info(f"   Validation: {len(self.X_val):,}")
-        
+         
         # Save full training data
         self.X_train_full = X_train
         self.y_train_full = y_train

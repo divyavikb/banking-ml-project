@@ -1,0 +1,14 @@
+artifact_uri: file:///D:/banking-ml-project/mlruns/684741718221181154/77fa5fc66fde4ed3a60d50ee49a2e203/artifacts
+end_time: 1772273904035
+entry_point_name: ''
+experiment_id: '684741718221181154'
+lifecycle_stage: active
+run_id: 77fa5fc66fde4ed3a60d50ee49a2e203
+run_name: model_training_comparison
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772273713587
+status: 3
+tags: []
+user_id: Dell

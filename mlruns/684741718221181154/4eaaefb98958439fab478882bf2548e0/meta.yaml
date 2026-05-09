@@ -1,0 +1,14 @@
+artifact_uri: file:///D:/banking-ml-project/mlruns/684741718221181154/4eaaefb98958439fab478882bf2548e0/artifacts
+end_time: 1772765559630
+entry_point_name: ''
+experiment_id: '684741718221181154'
+lifecycle_stage: active
+run_id: 4eaaefb98958439fab478882bf2548e0
+run_name: LightGBM
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772765536051
+status: 3
+tags: []
+user_id: Dell

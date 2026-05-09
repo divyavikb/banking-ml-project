@@ -1,0 +1,14 @@
+artifact_uri: file:///D:/banking-ml-project/mlruns/684741718221181154/3af0f043c95c49f9979a331a63281ee8/artifacts
+end_time: 1772273887540
+entry_point_name: ''
+experiment_id: '684741718221181154'
+lifecycle_stage: active
+run_id: 3af0f043c95c49f9979a331a63281ee8
+run_name: XGBoost
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1772273871572
+status: 3
+tags: []
+user_id: Dell

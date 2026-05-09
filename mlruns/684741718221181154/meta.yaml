@@ -1,0 +1,7 @@
+artifact_location: file:///D:/banking-ml-project/mlruns/684741718221181154
+creation_time: 1772273711829
+experiment_id: '684741718221181154'
+last_update_time: 1772273711829
+lifecycle_stage: active
+name: fraud-detection-training
+workspace: default
